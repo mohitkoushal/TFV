@@ -827,7 +827,9 @@ def main():
     st.components.v1.html("""
     <meta name="google-adsense-account" content="ca-pub-7220800899817072">
     """, height=0)
-     st.components.v1.html("""
+    
+    # AdSense ad unit - properly indented
+    st.components.v1.html("""
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7220800899817072"
          crossorigin="anonymous"></script>
     <ins class="adsbygoogle"
@@ -839,7 +841,7 @@ def main():
     <script>
          (adsbygoogle = window.adsbygoogle || []).push({});
     </script>
-    """, height=300)
+    """, height=100)
 
 #     st.markdown("""
 # <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7220800899817072"
