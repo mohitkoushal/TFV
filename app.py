@@ -417,17 +417,119 @@ def download_video(url):
         logging.critical(f"Critical download error: {e}", exc_info=True)
         return None
 
-# def youtube_progress_hook(d):
-#     """
-#     Progress hook for YouTube download to provide status updates
-#     """
-#     if d['status'] == 'downloading':
-#         downloaded_bytes = d.get('downloaded_bytes', 0)
-#         total_bytes = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+def get_video_info(url):
+    """Get available formats for a YouTube/Instagram video with specific quality options"""
+    try:
+        with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+            info = ydl.extract_info(url, download=False)
+            if not info:
+                st.error("Could not retrieve video information")
+                return None
+            
+            formats = []
+            if 'formats' in info:
+                # Filter only formats that have both video and audio
+                for f in info['formats']:
+                    if (f.get('ext') in ['mp4', 'webm'] and 
+                        f.get('vcodec') != 'none' and 
+                        f.get('acodec') != 'none'):
+                        
+                        # Get resolution
+                        resolution = f.get('resolution', 'unknown')
+                        height = 0
+                        if 'x' in resolution:
+                            height = int(resolution.split('x')[1])
+                        
+                        # Categorize into our desired quality levels
+                        quality = None
+                        if height >= 720:
+                            quality = 'HD (720p+)'
+                        elif height >= 480:
+                            quality = '480p'
+                        elif height >= 320:
+                            quality = '320p'
+                        
+                        if quality:
+                            formats.append({
+                                'format_id': f['format_id'],
+                                'ext': f['ext'],
+                                'resolution': resolution,
+                                'quality': quality,
+                                'height': height,
+                                'fps': f.get('fps', 0),
+                                'filesize': f.get('filesize', 0),
+                                'url': f.get('url')
+                            })
+            
+            # Sort formats by quality (HD first)
+            quality_order = {'HD (720p+)': 0, '480p': 1, '320p': 2}
+            formats.sort(key=lambda x: quality_order[x['quality']])
+            
+            # Group by quality and select best format for each quality
+            quality_groups = {}
+            for fmt in formats:
+                if fmt['quality'] not in quality_groups:
+                    quality_groups[fmt['quality']] = fmt
+            
+            # Get our desired quality formats
+            desired_qualities = ['HD (720p+)', '480p', '320p']
+            formats = [quality_groups[q] for q in desired_qualities if q in quality_groups]
+            
+            # For Instagram, sometimes we need to handle differently
+            if not formats and 'url' in info:
+                formats.append({
+                    'format_id': '0',
+                    'ext': 'mp4',
+                    'resolution': 'sd',
+                    'quality': 'SD',
+                    'height': 360,
+                    'fps': 30,
+                    'filesize': 0,
+                    'url': info['url']
+                })
+            
+            return {
+                'title': info.get('title', 'video'),
+                'thumbnail': info.get('thumbnail'),
+                'duration': info.get('duration', 0),
+                'formats': formats
+            }
+    except Exception as e:
+        st.error(f"Error getting video info: {e}")
+        return None
+
+def download_video_with_quality(url, format_id, output_path):
+    """Download video with specific quality"""
+    ydl_opts = {
+        'format': format_id,
+        'outtmpl': output_path,
+        'quiet': False,
+        'no_warnings': False,
+        'ignoreerrors': False
+    }
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+        return True
+    except Exception as e:
+        st.error(f"Download failed: {e}")
+        return False
+
+def format_duration(duration_seconds):
+    """Format duration in seconds to MM:SS or HH:MM:SS"""
+    try:
+        duration_seconds = float(duration_seconds)
+        hours = int(duration_seconds // 3600)
+        minutes = int((duration_seconds % 3600) // 60)
+        seconds = int(duration_seconds % 60)
         
-#         if total_bytes > 0:
-#             percent = downloaded_bytes * 100 / total_bytes
-#             st.info(f"Downloading: {percent:.1f}%")
+        if hours > 0:
+            return f"{hours}:{minutes:02d}:{seconds:02d}"
+        else:
+            return f"{minutes}:{seconds:02d}"
+    except:
+        return "Unknown"
 
 def main():
     st.set_page_config(
@@ -436,8 +538,7 @@ def main():
         layout="wide"
     )
     st.markdown("""
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7220800899817072"
-     crossorigin="anonymous"></script>
+    <meta name="google-adsense-account" content="ca-pub-7220800899817072">
     """, unsafe_allow_html=True)
 
     st.title("🌐 Video Text Extractor")
@@ -484,193 +585,274 @@ def main():
     if selected_language == 'hi':
         st.sidebar.info("For best Hindi results, use high-quality audio and select 'High Accuracy' mode")
 
-    # Main input section
-    col1, col2 = st.columns(2)
+    # Main input section - new tab layout
+    tab1, tab2 = st.tabs(["Text Extraction", "Video Downloader"])
     
-    with col1:
-        uploaded_file = st.file_uploader(
-            "Upload Video/Audio", 
-            type=['mp4', 'avi', 'mov', 'mkv', 'wav', 'mp3', 'm4a', 'ogg'],
-            help="Supported formats: MP4, AVI, MOV, MKV, WAV, MP3, M4A, OGG"
-        )
-    
-    with col2:
-        youtube_url = st.text_input(
-            "Or Paste YouTube/Instagram Reel URL",
-            placeholder="https://www.youtube.com/watch?v=... or https://www.instagram.com/reels/...",
-            help="Paste a YouTube or Instagram Reel URL to extract text from the video"
-        )
-
-    if st.button("Extract Text", type="primary"):
-        # Reset session state
-        st.session_state.input_path = None
-        st.session_state.audio_path = None
+    with tab1:
+        # Original text extraction functionality
+        col1, col2 = st.columns(2)
         
-        progress_bar = st.progress(0)
-        status_text = st.empty()
+        with col1:
+            uploaded_file = st.file_uploader(
+                "Upload Video/Audio", 
+                type=['mp4', 'avi', 'mov', 'mkv', 'wav', 'mp3', 'm4a', 'ogg'],
+                help="Supported formats: MP4, AVI, MOV, MKV, WAV, MP3, M4A, OGG"
+            )
         
-        try:
-            # Validate input
-            if not uploaded_file and not youtube_url:
-                st.error("Please upload a file or provide a YouTube URL")
-                return
+        with col2:
+            youtube_url = st.text_input(
+                "Or Paste YouTube/Instagram Reel URL",
+                placeholder="https://www.youtube.com/watch?v=... or https://www.instagram.com/reels/...",
+                help="Paste a YouTube or Instagram Reel URL to extract text from the video",
+                key="youtube_url_extract"
+            )
 
-            status_text.text("Processing input...")
+        if st.button("Extract Text", type="primary", key="extract_text_btn"):
+            # Reset session state
+            st.session_state.input_path = None
+            st.session_state.audio_path = None
             
-            # Determine input source
-            if uploaded_file:
-                try:
-                    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-                    
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
-                        temp_file.write(uploaded_file.read())
-                        st.session_state.input_path = temp_file.name
-                    
-                    if not st.session_state.input_path or not os.path.exists(st.session_state.input_path):
-                        st.error("Failed to process uploaded file")
-                        return
-                    
-                    file_size = os.path.getsize(st.session_state.input_path)
-                    if file_size == 0:
-                        st.error("Uploaded file is empty")
-                        return
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            try:
+                # Validate input
+                if not uploaded_file and not youtube_url:
+                    st.error("Please upload a file or provide a URL")
+                    return
+
+                status_text.text("Processing input...")
                 
-                except Exception as upload_error:
-                    logging.error(f"File upload error: {upload_error}")
-                    st.error(f"File upload error: {upload_error}")
-                    return
+                # Determine input source
+                if uploaded_file:
+                    try:
+                        file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+                        
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
+                            temp_file.write(uploaded_file.read())
+                            st.session_state.input_path = temp_file.name
+                        
+                        if not st.session_state.input_path or not os.path.exists(st.session_state.input_path):
+                            st.error("Failed to process uploaded file")
+                            return
+                        
+                        file_size = os.path.getsize(st.session_state.input_path)
+                        if file_size == 0:
+                            st.error("Uploaded file is empty")
+                            return
+                    
+                    except Exception as upload_error:
+                        logging.error(f"File upload error: {upload_error}")
+                        st.error(f"File upload error: {upload_error}")
+                        return
 
-            elif youtube_url:
-                status_text.text("Downloading YouTube video...")
-                st.session_state.input_path = download_video(youtube_url)
-                if not st.session_state.input_path:
-                    st.error("Failed to download YouTube video")
-                    return
+                elif youtube_url:
+                    status_text.text("Downloading video...")
+                    st.session_state.input_path = download_video(youtube_url)
+                    if not st.session_state.input_path:
+                        st.error("Failed to download video")
+                        return
 
-            progress_bar.progress(20)
-            status_text.text("Preparing audio for transcription...")
+                progress_bar.progress(20)
+                status_text.text("Preparing audio for transcription...")
 
-            # Convert video to audio if needed
-            if st.session_state.input_path.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
-                try:
-                    # Ensure the video file is not corrupted
-                    with st.spinner("Checking video file integrity..."):
-                        video = mp.VideoFileClip(st.session_state.input_path)
-                        if video.duration == 0:
-                            st.error("The video file appears to be corrupted or empty")
+                # Convert video to audio if needed
+                if st.session_state.input_path.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
+                    try:
+                        # Ensure the video file is not corrupted
+                        with st.spinner("Checking video file integrity..."):
+                            video = mp.VideoFileClip(st.session_state.input_path)
+                            if video.duration == 0:
+                                st.error("The video file appears to be corrupted or empty")
+                                return
+                                
+                        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_audio:
+                            st.session_state.audio_path = temp_audio.name
+                        
+                        with st.spinner("Extracting audio from video..."):
+                            video.audio.write_audiofile(
+                                st.session_state.audio_path, 
+                                codec='pcm_s16le',
+                                ffmpeg_params=['-ac', '1'],  # Convert to mono for better ASR
+                                verbose=False,
+                                logger=None
+                            )
+                            video.close()
+                            
+                        # Verify audio file was created properly
+                        if not os.path.exists(st.session_state.audio_path) or os.path.getsize(st.session_state.audio_path) == 0:
+                            st.error("Failed to extract valid audio from video")
                             return
                             
-                    with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_audio:
-                        st.session_state.audio_path = temp_audio.name
-                    
-                    with st.spinner("Extracting audio from video..."):
-                        video.audio.write_audiofile(
-                            st.session_state.audio_path, 
-                            codec='pcm_s16le',
-                            ffmpeg_params=['-ac', '1'],  # Convert to mono for better ASR
-                            verbose=False,
-                            logger=None
-                        )
-                        video.close()
-                        
-                    # Verify audio file was created properly
-                    if not os.path.exists(st.session_state.audio_path) or os.path.getsize(st.session_state.audio_path) == 0:
-                        st.error("Failed to extract valid audio from video")
+                    except Exception as e:
+                        st.error(f"Failed to extract audio: {e}")
                         return
-                        
-                except Exception as e:
-                    st.error(f"Failed to extract audio: {e}")
-                    return
-            else:
-                st.session_state.audio_path = st.session_state.input_path
+                else:
+                    st.session_state.audio_path = st.session_state.input_path
 
-            progress_bar.progress(40)
-            status_text.text("Starting transcription...")
+                progress_bar.progress(40)
+                status_text.text("Starting transcription...")
 
-            # Transcribe audio with selected language
-            transcription, lang_code, detected_language = converter.transcribe_audio(
-                st.session_state.audio_path,
-                language=selected_language
-            )
-            
-            # Show language info based on selection
-            if selected_language == 'auto':
-                st.info(f"Detected Language: {detected_language}")
-            else:
-                st.info(f"Transcribed in: {detected_language} (forced)")
-
-            progress_bar.progress(60)
-            status_text.text("Extracting text from video frames...")
-
-            # Extract text from video frames (if original input was a video)
-            if st.session_state.input_path.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
-                ocr_text = converter.advanced_ocr(st.session_state.input_path)
-            else:
-                ocr_text = "No video frames to extract text from"
-
-            progress_bar.progress(80)
-            status_text.text("Preparing results...")
-
-            # Display results
-            tab1, tab2 = st.tabs(["Audio Transcription", "Video Text Extraction"])
-            
-            with tab1:
-                col1, col2 = st.columns([4, 1])
-                with col1:
-                    st.subheader(f"🎙️ {detected_language} Audio Transcription")
-                with col2:
-                    if st.button("📋 Copy Transcription", key="copy_transcription"):
-                        pyperclip.copy(transcription)
-                        st.success("Copied to clipboard!")
+                # Transcribe audio with selected language
+                transcription, lang_code, detected_language = converter.transcribe_audio(
+                    st.session_state.audio_path,
+                    language=selected_language
+                )
                 
-                st.download_button(
-                    label=f"Download {detected_language} Transcription",
-                    data=transcription,
-                    file_name=f"{detected_language.lower()}_transcription.txt",
-                    mime="text/plain",
-                    key="transcription_download"
-                )
-                st.text_area(
-                    "Transcribed Text", 
-                    transcription, 
-                    height=400,
-                    label_visibility="collapsed",
-                    key="transcription_text_area"
-                )
+                # Show language info based on selection
+                if selected_language == 'auto':
+                    st.info(f"Detected Language: {detected_language}")
+                else:
+                    st.info(f"Transcribed in: {detected_language} (forced)")
+
+                progress_bar.progress(60)
+                status_text.text("Extracting text from video frames...")
+
+                # Extract text from video frames (if original input was a video)
+                if st.session_state.input_path.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
+                    ocr_text = converter.advanced_ocr(st.session_state.input_path)
+                else:
+                    ocr_text = "No video frames to extract text from"
+
+                progress_bar.progress(80)
+                status_text.text("Preparing results...")
+
+                # Display results
+                result_tab1, result_tab2 = st.tabs(["Audio Transcription", "Video Text Extraction"])
+                
+                with result_tab1:
+                    col1, col2 = st.columns([4, 1])
+                    with col1:
+                        st.subheader(f"🎙️ {detected_language} Audio Transcription")
+                    with col2:
+                        if st.button("📋 Copy Transcription", key="copy_transcription"):
+                            pyperclip.copy(transcription)
+                            st.success("Copied to clipboard!")
+                    
+                    st.download_button(
+                        label=f"Download {detected_language} Transcription",
+                        data=transcription,
+                        file_name=f"{detected_language.lower()}_transcription.txt",
+                        mime="text/plain",
+                        key="transcription_download"
+                    )
+                    st.text_area(
+                        "Transcribed Text", 
+                        transcription, 
+                        height=400,
+                        label_visibility="collapsed",
+                        key="transcription_text_area"
+                    )
+                
+                with result_tab2:
+                    st.subheader("📝 Extracted Text from Video Frames")
+                    st.download_button(
+                        label="Download OCR Text",
+                        data=ocr_text,
+                        file_name="ocr_text.txt",
+                        mime="text/plain",
+                        key="ocr_download"
+                    )
+                    st.text_area(
+                        "OCR Text", 
+                        ocr_text, 
+                        height=400,
+                        label_visibility="collapsed"
+                    )
+
+                progress_bar.progress(100)
+                status_text.text("Processing complete!")
+                time.sleep(1)
+                status_text.empty()
+
+            except Exception as e:
+                logging.error(f"Unexpected processing error: {e}", exc_info=True)
+                st.error(f"Processing error: {e}")
+            finally:
+                # Clean up temporary files
+                for path_var in ['input_path', 'audio_path']:
+                    path = getattr(st.session_state, path_var, None)
+                    if path and os.path.exists(path):
+                        try:
+                            os.unlink(path)
+                        except Exception as cleanup_error:
+                            logging.warning(f"File cleanup error for {path_var}: {cleanup_error}")
+
+    with tab2:
+        # Video Downloader functionality
+        st.subheader("Video Downloader")
+        st.markdown("Download videos in specific quality options with audio")
+        
+        download_url = st.text_input(
+            "Enter YouTube/Instagram Video URL",
+            placeholder="https://www.youtube.com/watch?v=... or https://www.instagram.com/reels/...",
+            key="download_url"
+        )
+        
+        if st.button("Get Download Options", key="get_options_btn"):
+            if not download_url:
+                st.error("Please enter a valid YouTube or Instagram URL")
+            else:
+                with st.spinner("Fetching video information..."):
+                    video_info = get_video_info(download_url)
+                    
+                    if video_info:
+                        st.session_state.video_info = video_info
+                        
+                        # Display video info
+                        col1, col2 = st.columns([1, 3])
+                        
+                        with col1:
+                            if video_info['thumbnail']:
+                                st.image(video_info['thumbnail'], caption="Video Thumbnail", width=200)
+                        
+                        with col2:
+                            st.markdown(f"**Title:** {video_info['title']}")
+                            formatted_duration = format_duration(video_info['duration'])
+                            st.markdown(f"**Duration:** {formatted_duration}")
+                            
+                            if video_info['formats']:
+                                st.success(f"Found {len(video_info['formats'])} quality options with audio")
+                            else:
+                                st.warning("No downloadable formats found")
+        
+        if 'video_info' in st.session_state and st.session_state.video_info:
+            st.subheader("Available Quality Options")
             
-            with tab2:
-                st.subheader("📝 Extracted Text from Video Frames")
-                st.download_button(
-                    label="Download OCR Text",
-                    data=ocr_text,
-                    file_name="ocr_text.txt",
-                    mime="text/plain",
-                    key="ocr_download"
-                )
-                st.text_area(
-                    "OCR Text", 
-                    ocr_text, 
-                    height=400,
-                    label_visibility="collapsed"
-                )
+            # Display download buttons for each quality
+            for fmt in st.session_state.video_info['formats']:
+                file_size = fmt.get('filesize', 0)
+                size_mb = file_size / (1024 * 1024) if file_size and file_size > 0 else "Unknown"
+                
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.markdown(f"""
+                    **Quality:** {fmt['quality']}  
+                    **Resolution:** {fmt['resolution']}  
+                    **Size:** {size_mb if isinstance(size_mb, str) else f'{size_mb:.1f} MB'}
+                    """)
+                with col2:
+                    # Create a download button for each quality
+                    output_filename = f"{st.session_state.video_info['title']}_{fmt['quality']}.{fmt['ext']}"
+                    output_filename = re.sub(r'[^\w\-_. ]', '_', output_filename)
+                    
+                    if st.button(f"Download {fmt['quality']}", key=f"dl_{fmt['format_id']}"):
+                        with st.spinner(f"Preparing {fmt['quality']} download..."):
+                            temp_dir = tempfile.mkdtemp()
+                            output_path = os.path.join(temp_dir, output_filename)
+                            
+                            if download_video_with_quality(download_url, fmt['format_id'], output_path):
+                                with open(output_path, 'rb') as f:
+                                    st.download_button(
+                                        label="Click to Save Video",
+                                        data=f,
+                                        file_name=output_filename,
+                                        mime=f"video/{fmt['ext']}",
+                                        key=f"save_{fmt['format_id']}"
+                                    )
+                            else:
+                                st.error("Download failed")
 
-            progress_bar.progress(100)
-            status_text.text("Processing complete!")
-            time.sleep(1)
-            status_text.empty()
-
-        except Exception as e:
-            logging.error(f"Unexpected processing error: {e}", exc_info=True)
-            st.error(f"Processing error: {e}")
-        finally:
-            # Clean up temporary files
-            for path_var in ['input_path', 'audio_path']:
-                path = getattr(st.session_state, path_var, None)
-                if path and os.path.exists(path):
-                    try:
-                        os.unlink(path)
-                    except Exception as cleanup_error:
-                        logging.warning(f"File cleanup error for {path_var}: {cleanup_error}")
 
     # Footer
     st.markdown("---")
