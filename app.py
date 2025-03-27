@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import moviepy.editor as mp
 import cv2
 import pytesseract
@@ -837,34 +838,7 @@ def add_google_adsense():
     """
     st.markdown(adsense_script, unsafe_allow_html=True)
 
-def serve_verification_file():
-    """
-    Serve Google AdSense verification HTML file
-    
-    Updated to work with current Streamlit query_params method
-    """
-    # Replace with your actual verification filename
-    verification_filename = 'googleca-pub-7220800899817072.html'
-    static_folder = 'static'
-    
-    # Ensure static folder exists
-    os.makedirs(static_folder, exist_ok=True)
-    
-    # Path to the verification file
-    file_path = os.path.join(static_folder, verification_filename)
-    
-    # If file doesn't exist, create it with minimal content
-    if not os.path.exists(file_path):
-        with open(file_path, 'w') as f:
-            f.write(f'google-site-verification: {verification_filename}')
-    
-    # Get current query parameters
-    query_params = st.query_params
-    
-    # Check if the file parameter matches
-    if query_params.get('file') == verification_filename:
-        with open(file_path, 'r') as f:
-            st.write(f.read())
+
 
 def main():
     st.set_page_config(
@@ -873,7 +847,23 @@ def main():
         layout="wide"
     )
     
-    serve_verification_file()
+    adsense_code = """
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7220800899817072"
+     crossorigin="anonymous"></script>
+<ins class="adsbygoogle"
+     style="display:block"
+     data-ad-client="ca-pub-7220800899817072"
+     data-ad-slot="1297128580"
+     data-ad-format="auto"
+     data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+"""
+
+    st.sidebar.subheader("Advertisement")
+    components.html(adsense_code, height=300)
+
 
 #     st.markdown("""
 # <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7220800899817072"
@@ -887,19 +877,19 @@ def main():
     """)
     
 
-    st.markdown("""
-    <div style="width: 100%; margin: 10px 0;">
-        <ins class="adsbygoogle"
-            style="display:block"
-            data-ad-client="ca-pub-7220800899817072"
-            data-ad-slot="1297128580"
-            data-ad-format="auto"
-            data-full-width-responsive="true"></ins>
-        <script>
-            (adsbygoogle = window.adsbygoogle || []).push({});
-        </script>
-    </div>
-    """, unsafe_allow_html=True)
+    # st.markdown("""
+    # <div style="width: 100%; margin: 10px 0;">
+    #     <ins class="adsbygoogle"
+    #         style="display:block"
+    #         data-ad-client="ca-pub-7220800899817072"
+    #         data-ad-slot="1297128580"
+    #         data-ad-format="auto"
+    #         data-full-width-responsive="true"></ins>
+    #     <script>
+    #         (adsbygoogle = window.adsbygoogle || []).push({});
+    #     </script>
+    # </div>
+    # """, unsafe_allow_html=True)
     
     # Sidebar for configuration
     st.sidebar.header("Settings")
