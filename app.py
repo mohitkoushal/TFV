@@ -837,6 +837,35 @@ def add_google_adsense():
     """
     st.markdown(adsense_script, unsafe_allow_html=True)
 
+def serve_verification_file():
+    """
+    Serve Google AdSense verification HTML file
+    
+    Updated to work with current Streamlit query_params method
+    """
+    # Replace with your actual verification filename
+    verification_filename = 'googleca-pub-7220800899817072.html'
+    static_folder = 'static'
+    
+    # Ensure static folder exists
+    os.makedirs(static_folder, exist_ok=True)
+    
+    # Path to the verification file
+    file_path = os.path.join(static_folder, verification_filename)
+    
+    # If file doesn't exist, create it with minimal content
+    if not os.path.exists(file_path):
+        with open(file_path, 'w') as f:
+            f.write(f'google-site-verification: {verification_filename}')
+    
+    # Get current query parameters
+    query_params = st.query_params
+    
+    # Check if the file parameter matches
+    if query_params.get('file') == verification_filename:
+        with open(file_path, 'r') as f:
+            st.write(f.read())
+
 def main():
     st.set_page_config(
         page_title="Multilingual Video Text Extractor", 
@@ -844,7 +873,7 @@ def main():
         layout="wide"
     )
     
-    
+    serve_verification_file()
 
 #     st.markdown("""
 # <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7220800899817072"
@@ -852,7 +881,6 @@ def main():
 # """, unsafe_allow_html=True)
 
     st.title("🌐 Video Text Extractor")
-    add_google_adsense()
     st.markdown("""
     Extract complete and accurate text from video/audio in multiple languages.
     Supports both uploaded files and YouTube/Insta URLs.
@@ -1090,7 +1118,6 @@ def main():
                         except Exception as cleanup_error:
                             logging.warning(f"File cleanup error for {path_var}: {cleanup_error}")
 
-    add_google_adsense()
     with tab2:
         # Video Downloader functionality
         st.subheader("Video/Audio Downloader")
