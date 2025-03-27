@@ -344,47 +344,63 @@ def download_video(url, quality='best'):
         # Enhanced quality selection with better format specifications
         if quality == '1080p (FHD)':
             ydl_opts = {
-                'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best',
+                'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio/best[height<=1080]',
                 'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
                 'quiet': False,
                 'no_warnings': False,
                 'merge_output_format': 'mp4',
                 'retries': 3,
                 'fragment_retries': 3,
-                'extract_flat': False
+                'extract_flat': False,
+                'postprocessors': [{
+                    'key': 'FFmpegVideoConvertor',
+                    'preferedformat': 'mp4',
+                }],
             }
         elif quality == '720p (HD)':
             ydl_opts = {
-                'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
+                'format': 'bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]',
                 'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
                 'quiet': False,
                 'no_warnings': False,
                 'merge_output_format': 'mp4',
                 'retries': 3,
                 'fragment_retries': 3,
-                'extract_flat': False
+                'extract_flat': False,
+                'postprocessors': [{
+                    'key': 'FFmpegVideoConvertor',
+                    'preferedformat': 'mp4',
+                }],
             }
         elif quality == '480p':
             ydl_opts = {
-                'format': 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best',
+                'format': 'bestvideo[height<=480][ext=mp4]+bestaudio/best[height<=480]',
                 'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
                 'quiet': False,
                 'no_warnings': False,
                 'merge_output_format': 'mp4',
                 'retries': 3,
                 'fragment_retries': 3,
-                'extract_flat': False
+                'extract_flat': False,
+                'postprocessors': [{
+                    'key': 'FFmpegVideoConvertor',
+                    'preferedformat': 'mp4',
+                }],
             }
         elif quality == '360p':
             ydl_opts = {
-                'format': 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best',
+                'format': 'bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360]',
                 'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
                 'quiet': False,
                 'no_warnings': False,
                 'merge_output_format': 'mp4',
                 'retries': 3,
                 'fragment_retries': 3,
-                'extract_flat': False
+                'extract_flat': False,
+                'postprocessors': [{
+                    'key': 'FFmpegVideoConvertor',
+                    'preferedformat': 'mp4',
+                }],
             }
         elif quality == 'Best Audio (MP3)':
             ydl_opts = {
@@ -403,14 +419,18 @@ def download_video(url, quality='best'):
             }
         else:  # best quality
             ydl_opts = {
-                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                'format': 'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
                 'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
                 'quiet': False,
                 'no_warnings': False,
                 'merge_output_format': 'mp4',
                 'retries': 3,
                 'fragment_retries': 3,
-                'extract_flat': False
+                'extract_flat': False,
+                'postprocessors': [{
+                    'key': 'FFmpegVideoConvertor',
+                    'preferedformat': 'mp4',
+                }],
             }
 
         st.info(f"Downloading video in {quality} quality...")
@@ -423,12 +443,15 @@ def download_video(url, quality='best'):
             if quality == 'Best Audio (MP3)':
                 filename = filename.replace('.webm', '.mp3').replace('.m4a', '.mp3')
             
+            # Find the actual downloaded file
             if not os.path.exists(filename):
-                # Try alternative filename if primary doesn't exist
-                alt_ext = '.mp3' if quality == 'Best Audio (MP3)' else '.mp4'
-                alt_filename = os.path.join(temp_dir, f"{info['title']}{alt_ext}")
-                if os.path.exists(alt_filename):
-                    filename = alt_filename
+                # Try alternative filename patterns
+                base_name = os.path.splitext(filename)[0]
+                for ext in ['.mp4', '.webm', '.mkv', '.mp3']:
+                    alt_filename = base_name + ext
+                    if os.path.exists(alt_filename):
+                        filename = alt_filename
+                        break
                 else:
                     st.error("Download failed - file not found")
                     return None
@@ -438,12 +461,21 @@ def download_video(url, quality='best'):
 
     except Exception as e:
         st.error(f"Download error: {str(e)}")
+        logging.error(f"Download error: {str(e)}", exc_info=True)
         return None
 
 def get_available_formats(url):
     """Get available formats for a video with enhanced quality detection"""
     try:
-        with yt_dlp.YoutubeDL({'quiet': True, 'extract_flat': False}) as ydl:
+        ydl_opts = {
+            'quiet': True,
+            'extract_flat': False,
+            'noplaylist': True,
+            'ignoreerrors': True,
+            'force_generic_extractor': True
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             if not info:
                 st.error("Could not retrieve video information")
@@ -453,15 +485,22 @@ def get_available_formats(url):
             if 'formats' in info:
                 # First get all video formats with both video and audio
                 for f in info['formats']:
-                    if f.get('vcodec') != 'none' and f.get('acodec') != 'none':
-                        height = f.get('height', 0) or 0  # Ensure height is not None
-                        width = f.get('width', 0) or 0    # Ensure width is not None
+                    try:
+                        # Skip formats without necessary info
+                        if not f.get('url') or not f.get('ext'):
+                            continue
+                            
+                        height = f.get('height', 0) or 0
+                        width = f.get('width', 0) or 0
                         filesize = f.get('filesize', 0) or 0
-                        ext = f.get('ext', 'mp4')
-                        format_note = f.get('format_note', '')
+                        ext = f.get('ext', '').lower()
                         
                         # Skip audio-only formats here
-                        if height == 0:
+                        if f.get('vcodec') == 'none':
+                            continue
+                            
+                        # Only consider mp4, webm, or formats that can be converted to mp4
+                        if ext not in ['mp4', 'webm', 'mkv', 'mov', 'avi']:
                             continue
                             
                         # Categorize quality
@@ -478,41 +517,63 @@ def get_available_formats(url):
                             
                         formats.append({
                             'format_id': f['format_id'],
-                            'ext': ext,
+                            'ext': 'mp4',  # Force mp4 output
                             'quality': quality,
                             'height': height,
                             'width': width,
                             'filesize': filesize,
                             'fps': f.get('fps', 30) or 30,
                             'url': f.get('url'),
-                            'type': 'video'
+                            'type': 'video',
+                            'original_ext': ext
                         })
+                    except Exception as fmt_error:
+                        logging.warning(f"Error processing format: {fmt_error}")
+                        continue
                 
                 # Add best audio-only format
-                audio_formats = [f for f in info['formats'] if f.get('acodec') != 'none' and f.get('vcodec') == 'none']
+                audio_formats = [f for f in info['formats'] if f.get('acodec') != 'none']
                 if audio_formats:
-                    # Find format with highest bitrate
-                    best_audio = max(
-                        audio_formats, 
-                        key=lambda x: x.get('abr', 0) or 0,
-                        default=None
-                    )
-                    
-                    if best_audio:
-                        formats.append({
-                            'format_id': best_audio['format_id'],
-                            'ext': 'mp3',
-                            'quality': 'Best Audio (MP3)',
-                            'height': 0,
-                            'width': 0,
-                            'filesize': best_audio.get('filesize', 0) or 0,
-                            'fps': 0,
-                            'url': best_audio.get('url'),
-                            'type': 'audio',
-                            'abr': best_audio.get('abr', 0) or 0
-                        })
+                    try:
+                        # Find format with highest bitrate
+                        best_audio = max(
+                            audio_formats, 
+                            key=lambda x: x.get('abr', 0) or 0,
+                            default=None
+                        )
+                        
+                        if best_audio:
+                            formats.append({
+                                'format_id': best_audio['format_id'],
+                                'ext': 'mp3',
+                                'quality': 'Best Audio (MP3)',
+                                'height': 0,
+                                'width': 0,
+                                'filesize': best_audio.get('filesize', 0) or 0,
+                                'fps': 0,
+                                'url': best_audio.get('url'),
+                                'type': 'audio',
+                                'abr': best_audio.get('abr', 0) or 0
+                            })
+                    except Exception as audio_error:
+                        logging.warning(f"Error processing audio formats: {audio_error}")
             
-            # Sort by quality (highest first) with proper null handling
+            # If no formats found, try to get at least one format
+            if not formats and 'url' in info:
+                formats.append({
+                    'format_id': '0',
+                    'ext': 'mp4',
+                    'quality': 'SD',
+                    'height': 0,
+                    'width': 0,
+                    'filesize': 0,
+                    'fps': 30,
+                    'url': info['url'],
+                    'type': 'video',
+                    'original_ext': 'mp4'
+                })
+            
+            # Sort by quality (highest first)
             quality_order = {
                 '1080p (FHD)': 0,
                 '720p (HD)': 1,
