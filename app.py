@@ -845,29 +845,9 @@ def main():
     st.set_page_config(
         page_title="Multilingual Video Text Extractor", 
         page_icon="🌐",
-        layout="wide"
-    )
-    components.html(
-        f'<meta name="google-adsense-account" content="ca-pub-7220800899817072">',
-        height=0  # Make it non-visible
+        layout="wide",
     )
     
-    adsense_code = """
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7220800899817072"
-     crossorigin="anonymous"></script>
-<ins class="adsbygoogle"
-     style="display:block"
-     data-ad-client="ca-pub-7220800899817072"
-     data-ad-slot="1297128580"
-     data-ad-format="auto"
-     data-full-width-responsive="true"></ins>
-<script>
-     (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-"""
-
-    st.sidebar.subheader("Advertisement")
-    components.html(adsense_code, height=300)
 
 
 #     st.markdown("""
