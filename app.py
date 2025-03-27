@@ -871,6 +871,11 @@ def main():
 # """, unsafe_allow_html=True)
 
     st.title("🌐 Video Text Extractor")
+    components.html(
+        f'<meta name="google-adsense-account" content="ca-pub-7220800899817072">',
+        height=0  # Make it non-visible
+    )
+
     st.markdown("""
     Extract complete and accurate text from video/audio in multiple languages.
     Supports both uploaded files and YouTube/Insta URLs.
