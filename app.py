@@ -541,6 +541,11 @@ def main():
     <meta name="google-adsense-account" content="ca-pub-7220800899817072">
     """, unsafe_allow_html=True)
 
+    st.markdown("""
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7220800899817072"
+     crossorigin="anonymous"></script>
+""", unsafe_allow_html=True)
+
     st.title("🌐 Video Text Extractor")
     st.markdown("""
     Extract complete and accurate text from video/audio in multiple languages.
