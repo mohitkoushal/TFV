@@ -816,6 +816,27 @@ def format_duration(duration_seconds):
     except:
         return "Unknown"
 
+def add_google_adsense():
+    """
+    Adds Google AdSense script to a Streamlit app
+    Note: Replace 'YOUR_AD_CLIENT_ID' with your actual Google AdSense client ID
+    """
+    adsense_script = """
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7220800899817072"
+     crossorigin="anonymous"></script>
+    <!-- Your Ad Unit -->
+    <ins class="adsbygoogle"
+     style="display:block"
+     data-ad-client="ca-pub-7220800899817072"
+     data-ad-slot="1297128580"
+     data-ad-format="auto"
+     data-full-width-responsive="true"></ins>
+    <script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+    </script>
+    """
+    st.markdown(adsense_script, unsafe_allow_html=True)
+
 def main():
     st.set_page_config(
         page_title="Multilingual Video Text Extractor", 
@@ -823,28 +844,7 @@ def main():
         layout="wide"
     )
     
-    # Verification meta tag
     
-    st.components.v1.html("""
-    <head>
-        <meta name="google-adsense-account" content="ca-pub-7220800899817072">
-    </head>
-    """, height=0)
-    
-    # AdSense ad unit - properly indented
-    st.components.v1.html("""
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7220800899817072"
-         crossorigin="anonymous"></script>
-    <ins class="adsbygoogle"
-         style="display:block; margin: 20px 0;"
-         data-ad-client="ca-pub-7220800899817072"
-         data-ad-slot="1297128580"
-         data-ad-format="auto"
-         data-full-width-responsive="true"></ins>
-    <script>
-         (adsbygoogle = window.adsbygoogle || []).push({});
-    </script>
-    """, height=100)
 
 #     st.markdown("""
 # <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7220800899817072"
@@ -852,6 +852,7 @@ def main():
 # """, unsafe_allow_html=True)
 
     st.title("🌐 Video Text Extractor")
+    add_google_adsense()
     st.markdown("""
     Extract complete and accurate text from video/audio in multiple languages.
     Supports both uploaded files and YouTube/Insta URLs.
@@ -1089,6 +1090,7 @@ def main():
                         except Exception as cleanup_error:
                             logging.warning(f"File cleanup error for {path_var}: {cleanup_error}")
 
+    add_google_adsense()
     with tab2:
         # Video Downloader functionality
         st.subheader("Video/Audio Downloader")
