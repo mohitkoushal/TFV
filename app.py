@@ -841,14 +841,15 @@ def add_google_adsense():
 
 
 def main():
-    components.html(
-        f'<meta name="google-adsense-account" content="ca-pub-7220800899817072">',
-        height=0  # Make it non-visible
-    )
+    
     st.set_page_config(
         page_title="Multilingual Video Text Extractor", 
         page_icon="🌐",
         layout="wide"
+    )
+    components.html(
+        f'<meta name="google-adsense-account" content="ca-pub-7220800899817072">',
+        height=0  # Make it non-visible
     )
     
     adsense_code = """
