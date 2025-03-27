@@ -841,6 +841,10 @@ def add_google_adsense():
 
 
 def main():
+    components.html(
+        f'<meta name="google-adsense-account" content="ca-pub-7220800899817072">',
+        height=0  # Make it non-visible
+    )
     st.set_page_config(
         page_title="Multilingual Video Text Extractor", 
         page_icon="🌐",
@@ -871,10 +875,7 @@ def main():
 # """, unsafe_allow_html=True)
 
     st.title("🌐 Video Text Extractor")
-    components.html(
-        f'<meta name="google-adsense-account" content="ca-pub-7220800899817072">',
-        height=0  # Make it non-visible
-    )
+    
 
     st.markdown("""
     Extract complete and accurate text from video/audio in multiple languages.
