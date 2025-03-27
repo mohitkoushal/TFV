@@ -824,8 +824,11 @@ def main():
     )
     
     # Verification meta tag
+    
     st.components.v1.html("""
-    <meta name="google-adsense-account" content="ca-pub-7220800899817072">
+    <head>
+        <meta name="google-adsense-account" content="ca-pub-7220800899817072">
+    </head>
     """, height=0)
     
     # AdSense ad unit - properly indented
