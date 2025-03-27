@@ -822,20 +822,36 @@ def main():
         page_icon="🌐",
         layout="wide"
     )
-    st.markdown("""
+    
+    # Verification meta tag
+    st.components.v1.html("""
     <meta name="google-adsense-account" content="ca-pub-7220800899817072">
-    """, unsafe_allow_html=True)
+    """, height=0)
+     st.components.v1.html("""
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7220800899817072"
+         crossorigin="anonymous"></script>
+    <ins class="adsbygoogle"
+         style="display:block; margin: 20px 0;"
+         data-ad-client="ca-pub-7220800899817072"
+         data-ad-slot="1297128580"
+         data-ad-format="auto"
+         data-full-width-responsive="true"></ins>
+    <script>
+         (adsbygoogle = window.adsbygoogle || []).push({});
+    </script>
+    """, height=300)
 
-    st.markdown("""
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7220800899817072"
-     crossorigin="anonymous"></script>
-""", unsafe_allow_html=True)
+#     st.markdown("""
+# <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7220800899817072"
+#      crossorigin="anonymous"></script>
+# """, unsafe_allow_html=True)
 
     st.title("🌐 Video Text Extractor")
     st.markdown("""
     Extract complete and accurate text from video/audio in multiple languages.
     Supports both uploaded files and YouTube/Insta URLs.
     """)
+    
 
     st.markdown("""
     <div style="width: 100%; margin: 10px 0;">
