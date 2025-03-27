@@ -352,9 +352,12 @@ def download_video(url, quality='best'):
                 'retries': 3,
                 'fragment_retries': 3,
                 'extract_flat': False,
+                'postprocessor_args': ['-ar', '16000'],  # Set audio sample rate
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
                     'preferedformat': 'mp4',
+                }, {
+                    'key': 'FFmpegMetadata'
                 }],
             }
         elif quality == '720p (HD)':
@@ -370,6 +373,8 @@ def download_video(url, quality='best'):
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
                     'preferedformat': 'mp4',
+                }, {
+                    'key': 'FFmpegMetadata'
                 }],
             }
         elif quality == '480p':
@@ -385,6 +390,8 @@ def download_video(url, quality='best'):
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
                     'preferedformat': 'mp4',
+                }, {
+                    'key': 'FFmpegMetadata'
                 }],
             }
         elif quality == '360p':
@@ -400,6 +407,8 @@ def download_video(url, quality='best'):
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
                     'preferedformat': 'mp4',
+                }, {
+                    'key': 'FFmpegMetadata'
                 }],
             }
         elif quality == 'Best Audio (MP3)':
@@ -419,7 +428,8 @@ def download_video(url, quality='best'):
             }
         else:  # best quality
             ydl_opts = {
-                'format': 'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
+                # This format selector ensures we get best video + best audio
+                'format': '(bestvideo[vcodec^=avc1][height<=1080][fps<=30]/bestvideo[height<=1080]/bestvideo)+bestaudio/best',
                 'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
                 'quiet': False,
                 'no_warnings': False,
@@ -430,6 +440,8 @@ def download_video(url, quality='best'):
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
                     'preferedformat': 'mp4',
+                }, {
+                    'key': 'FFmpegMetadata'
                 }],
             }
 
@@ -456,6 +468,71 @@ def download_video(url, quality='best'):
                     st.error("Download failed - file not found")
                     return None
             
+            # Verify the downloaded file has audio (for video files)
+            if filename.lower().endswith(('.mp4', '.mkv', '.webm')):
+                try:
+                    clip = mp.VideoFileClip(filename)
+                    if not clip.audio:
+                        st.warning("Downloaded video has no audio - attempting to merge audio stream...")
+                        
+                        # Try to get best audio and merge
+                        audio_ydl_opts = {
+                            'format': 'bestaudio/best',
+                            'outtmpl': os.path.join(temp_dir, 'audio_temp.%(ext)s'),
+                            'quiet': True,
+                            'no_warnings': True,
+                            'extract_flat': False
+                        }
+                        
+                        with yt_dlp.YoutubeDL(audio_ydl_opts) as audio_ydl:
+                            audio_info = audio_ydl.extract_info(url, download=True)
+                            audio_filename = audio_ydl.prepare_filename(audio_info)
+                            
+                            # Find the actual audio file
+                            if not os.path.exists(audio_filename):
+                                base_name = os.path.splitext(audio_filename)[0]
+                                for ext in ['.m4a', '.webm', '.mp3']:
+                                    alt_audio = base_name + ext
+                                    if os.path.exists(alt_audio):
+                                        audio_filename = alt_audio
+                                        break
+                            
+                            if os.path.exists(audio_filename):
+                                # Merge video and audio
+                                video_clip = mp.VideoFileClip(filename)
+                                audio_clip = mp.AudioFileClip(audio_filename)
+                                
+                                # Ensure audio duration matches video
+                                if audio_clip.duration > video_clip.duration:
+                                    audio_clip = audio_clip.subclip(0, video_clip.duration)
+                                
+                                final_clip = video_clip.set_audio(audio_clip)
+                                merged_filename = os.path.join(temp_dir, f"merged_{os.path.basename(filename)}")
+                                final_clip.write_videofile(
+                                    merged_filename,
+                                    codec='libx264',
+                                    audio_codec='aac',
+                                    temp_audiofile='temp-audio.m4a',
+                                    remove_temp=True,
+                                    threads=4
+                                )
+                                
+                                # Clean up
+                                video_clip.close()
+                                audio_clip.close()
+                                os.unlink(filename)
+                                os.unlink(audio_filename)
+                                
+                                # Use the merged file
+                                filename = merged_filename
+                                st.success("Successfully merged audio with video!")
+                            else:
+                                st.error("Could not download audio stream to merge")
+                    
+                    clip.close()
+                except Exception as e:
+                    st.warning(f"Could not verify audio: {e}")
+            
             st.success(f"Successfully downloaded: {os.path.basename(filename)}")
             return filename
 
@@ -463,6 +540,7 @@ def download_video(url, quality='best'):
         st.error(f"Download error: {str(e)}")
         logging.error(f"Download error: {str(e)}", exc_info=True)
         return None
+
 
 def get_available_formats(url):
     """Get available formats for a video with enhanced quality detection"""
