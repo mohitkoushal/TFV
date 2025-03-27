@@ -1,0 +1,10 @@
+streamlit
+moviepy
+opencv-python-headless
+pytesseract
+numpy
+yt-dlp
+pydub
+faster-whisper
+torch
+pyperclip
